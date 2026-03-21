@@ -1,15 +1,14 @@
 'use client'
 
 import { useActionState } from 'react'
-import { login, type AuthState } from '@/app/actions/auth'
+import { updatePassword, type AuthState } from '@/app/actions/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import Link from 'next/link'
 
-export default function LoginPage() {
-  const [state, formAction, pending] = useActionState<AuthState, FormData>(login, null)
+export default function UpdatePasswordPage() {
+  const [state, formAction, pending] = useActionState<AuthState, FormData>(updatePassword, null)
 
   return (
     <div className="space-y-6">
@@ -18,14 +17,14 @@ export default function LoginPage() {
           Boat Club
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Sign in to your account
+          Set your new password
         </p>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Login</CardTitle>
+          <CardTitle>Update Password</CardTitle>
           <CardDescription>
-            Enter your email and password to continue
+            Enter your new password below
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -36,17 +35,7 @@ export default function LoginPage() {
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="you@example.com"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">New Password</Label>
               <Input
                 id="password"
                 name="password"
@@ -55,17 +44,19 @@ export default function LoginPage() {
                 required
               />
             </div>
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? 'Signing in...' : 'Sign in'}
-            </Button>
-            <div className="text-center">
-              <Link
-                href="/reset-password"
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                Forgot your password?
-              </Link>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                placeholder="••••••••"
+                required
+              />
             </div>
+            <Button type="submit" className="w-full" disabled={pending}>
+              {pending ? 'Updating...' : 'Update password'}
+            </Button>
           </form>
         </CardContent>
       </Card>
