@@ -1,15 +1,15 @@
 'use client'
 
 import { useActionState } from 'react'
-import { login, type AuthState } from '@/app/actions/auth'
+import { resetPassword, type AuthState } from '@/app/actions/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
 
-export default function LoginPage() {
-  const [state, formAction, pending] = useActionState<AuthState, FormData>(login, null)
+export default function ResetPasswordPage() {
+  const [state, formAction, pending] = useActionState<AuthState, FormData>(resetPassword, null)
 
   return (
     <div className="space-y-6">
@@ -18,14 +18,14 @@ export default function LoginPage() {
           Boat Club
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Sign in to your account
+          Reset your password
         </p>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Login</CardTitle>
+          <CardTitle>Forgot Password</CardTitle>
           <CardDescription>
-            Enter your email and password to continue
+            Enter your email and we'll send you a reset link
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -33,6 +33,11 @@ export default function LoginPage() {
             {state?.error && (
               <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                 {state.error}
+              </div>
+            )}
+            {state?.success && (
+              <div className="rounded-md bg-green-500/10 p-3 text-sm text-green-700 dark:text-green-400">
+                {state.success}
               </div>
             )}
             <div className="space-y-2">
@@ -45,25 +50,15 @@ export default function LoginPage() {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="••••••••"
-                required
-              />
-            </div>
             <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? 'Signing in...' : 'Sign in'}
+              {pending ? 'Sending...' : 'Send reset link'}
             </Button>
             <div className="text-center">
               <Link
-                href="/reset-password"
+                href="/login"
                 className="text-sm text-muted-foreground hover:text-foreground"
               >
-                Forgot your password?
+                Back to login
               </Link>
             </div>
           </form>
