@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"curl -s -o /dev/null -w \\\"%{http_code}\\\" https://registry.npmjs.org/@supabase%2fsupabase-js\",\"description\":\"Test direct HTTP access to npm registry\"}",
-  "error": "Exit code 56\n000",
-  "timestamp": "2026-03-19T23:17:19.166Z",
-  "retry_count": 2
-}

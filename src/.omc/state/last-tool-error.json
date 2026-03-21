@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd /Users/hishamsalameh/Downloads/boat-club-management && npm install @supabase/supabase-js @supabase/ssr stripe zod 2>&1\",\"timeout\":120000,\"description\":\"Install Supabase, Stripe, Zod\"}",
-  "error": "Exit code 1\nnpm error code E403\nnpm error 403 403 Forbidden - GET https://registry.npmjs.org/@supabase%2fssr\nnpm error 403 In most cases, you or one of your dependencies are requesting\nnpm error 403 a package version that is forbidden by your security policy, or\nnpm error 403 on a server you do not have access to.\nnpm error A complete log of this run can be found in: /Users/hishamsalameh/.npm/_logs/2026-03-19T23_16_33_392Z-debug-0.log",
-  "timestamp": "2026-03-19T23:16:33.977Z",
-  "retry_count": 2
-}
