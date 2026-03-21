@@ -6,12 +6,21 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { FormSelect } from '@/components/form-select'
 import Link from 'next/link'
+
+type Slot = {
+  id: string
+  name: string
+  start_time: string
+  end_time: string
+  available: boolean
+}
 
 type Boat = {
   id: string
   name: string
-  available_slots: { id: string; name: string; start_time: string; end_time: string }[]
+  slots: Slot[]
 }
 
 type Member = {
@@ -69,22 +78,18 @@ export default function AdminNewReservationPage() {
 
             {/* Member select */}
             <div className="space-y-2">
-              <Label htmlFor="user_id">Member *</Label>
-              <select
-                id="user_id"
+              <Label>Member *</Label>
+              <FormSelect
                 name="user_id"
-                required
+                placeholder="Select a member"
                 value={selectedUser}
-                onChange={(e) => setSelectedUser(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <option value="">Select a member</option>
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.first_name} {m.last_name} ({m.email})
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedUser}
+                required
+                options={members.map((m) => ({
+                  value: m.id,
+                  label: `${m.first_name} ${m.last_name} (${m.email})`,
+                }))}
+              />
             </div>
 
             {/* Date */}
@@ -110,47 +115,44 @@ export default function AdminNewReservationPage() {
             {!loading && availability.length > 0 && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="boat_id">Boat *</Label>
-                  <select
-                    id="boat_id"
+                  <Label>Boat *</Label>
+                  <FormSelect
                     name="boat_id"
-                    required
+                    placeholder="Select a boat"
                     value={selectedBoat}
-                    onChange={(e) => {
-                      setSelectedBoat(e.target.value)
+                    onChange={(val) => {
+                      setSelectedBoat(val)
                       setSelectedSlot('')
                     }}
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <option value="">Select a boat</option>
-                    {availability.map((boat) => (
-                      <option key={boat.id} value={boat.id}>
-                        {boat.name} ({boat.available_slots.length} slot{boat.available_slots.length !== 1 ? 's' : ''} available)
-                      </option>
-                    ))}
-                  </select>
+                    required
+                    options={availability.map((boat) => {
+                      const availableCount = boat.slots.filter((s) => s.available).length
+                      return {
+                        value: boat.id,
+                        label: `${boat.name} (${availableCount} slot${availableCount !== 1 ? 's' : ''} available)`,
+                      }
+                    })}
+                  />
                 </div>
 
                 {selectedBoat && (
                   <div className="space-y-2">
-                    <Label htmlFor="time_slot_id">Time Slot *</Label>
-                    <select
-                      id="time_slot_id"
+                    <Label>Time Slot *</Label>
+                    <FormSelect
                       name="time_slot_id"
-                      required
+                      placeholder="Select a time slot"
                       value={selectedSlot}
-                      onChange={(e) => setSelectedSlot(e.target.value)}
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    >
-                      <option value="">Select a time slot</option>
-                      {availability
-                        .find((b) => b.id === selectedBoat)
-                        ?.available_slots.map((slot) => (
-                          <option key={slot.id} value={slot.id}>
-                            {slot.name} ({slot.start_time}–{slot.end_time})
-                          </option>
-                        ))}
-                    </select>
+                      onChange={setSelectedSlot}
+                      required
+                      options={
+                        availability
+                          .find((b) => b.id === selectedBoat)
+                          ?.slots.filter((slot) => slot.available).map((slot) => ({
+                            value: slot.id,
+                            label: `${slot.name} (${slot.start_time}–${slot.end_time})`,
+                          })) ?? []
+                      }
+                    />
                   </div>
                 )}
               </>

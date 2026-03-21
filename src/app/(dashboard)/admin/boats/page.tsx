@@ -28,6 +28,7 @@ export default async function BoatsPage() {
         </Button>
       </div>
 
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -73,6 +74,7 @@ export default async function BoatsPage() {
           )}
         </TableBody>
       </Table>
+      </div>
     </div>
   )
 }

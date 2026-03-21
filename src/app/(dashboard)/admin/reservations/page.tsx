@@ -12,12 +12,25 @@ import {
 import { cancelReservation } from '@/app/actions/reservations'
 import Link from 'next/link'
 
-export default async function AdminReservationsPage() {
+export default async function AdminReservationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>
+}) {
+  const { view } = await searchParams
+  const tab = view === 'past' ? 'past' : 'upcoming'
+
   const supabase = createServiceClient()
+  const today = new Date().toISOString().split('T')[0]
+
   const { data: reservations } = await supabase
     .from('reservations')
     .select('*, boat:boats(name), time_slot:time_slots(name, start_time, end_time), user:users!reservations_user_id_fkey(first_name, last_name, email)')
-    .order('date', { ascending: true })
+    .order('date', { ascending: tab === 'upcoming' })
+
+  const upcoming = (reservations ?? []).filter((r) => r.date >= today)
+  const past = (reservations ?? []).filter((r) => r.date < today)
+  const displayed = tab === 'upcoming' ? upcoming : past
 
   return (
     <div className="space-y-6">
@@ -28,7 +41,32 @@ export default async function AdminReservationsPage() {
         </Button>
       </div>
 
-      <Table>
+      {/* Tabs */}
+      <div className="flex gap-1 rounded-lg bg-muted p-1">
+        <Link
+          href="/admin/reservations?view=upcoming"
+          className={`flex-1 rounded-md px-4 py-2 text-center text-sm font-medium transition-colors ${
+            tab === 'upcoming'
+              ? 'bg-background shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Upcoming ({upcoming.length})
+        </Link>
+        <Link
+          href="/admin/reservations?view=past"
+          className={`flex-1 rounded-md px-4 py-2 text-center text-sm font-medium transition-colors ${
+            tab === 'past'
+              ? 'bg-background shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Past ({past.length})
+        </Link>
+      </div>
+
+      <div className="overflow-x-auto">
+        <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Member</TableHead>
@@ -40,8 +78,8 @@ export default async function AdminReservationsPage() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {reservations && reservations.length > 0 ? (
-            reservations.map((res) => (
+          {displayed.length > 0 ? (
+            displayed.map((res) => (
               <TableRow key={res.id}>
                 <TableCell>
                   <div>
@@ -60,7 +98,7 @@ export default async function AdminReservationsPage() {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  {res.status === 'active' && (
+                  {res.status === 'active' && res.date >= today && (
                     <form action={cancelReservation.bind(null, res.id)}>
                       <Button variant="destructive" size="sm">
                         Cancel
@@ -73,12 +111,13 @@ export default async function AdminReservationsPage() {
           ) : (
             <TableRow>
               <TableCell colSpan={6} className="text-center text-muted-foreground">
-                No reservations yet.
+                {tab === 'upcoming' ? 'No upcoming reservations.' : 'No past reservations.'}
               </TableCell>
             </TableRow>
           )}
         </TableBody>
       </Table>
+      </div>
     </div>
   )
 }

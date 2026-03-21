@@ -33,6 +33,7 @@ export default async function MyReservationsPage() {
         </Button>
       </div>
 
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -80,6 +81,7 @@ export default async function MyReservationsPage() {
           )}
         </TableBody>
       </Table>
+      </div>
     </div>
   )
 }
