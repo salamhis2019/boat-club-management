@@ -10,7 +10,9 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { cancelReservation } from '@/app/actions/reservations'
+import { TabSwitcher } from '@/components/tab-switcher'
 import Link from 'next/link'
+import { formatDateString, formatTime } from '@/lib/helpers/date.helper'
 
 export default async function AdminReservationsPage({
   searchParams,
@@ -21,7 +23,7 @@ export default async function AdminReservationsPage({
   const tab = view === 'past' ? 'past' : 'upcoming'
 
   const supabase = createServiceClient()
-  const today = new Date().toISOString().split('T')[0]
+  const today = formatDateString(new Date())
 
   const { data: reservations } = await supabase
     .from('reservations')
@@ -41,29 +43,10 @@ export default async function AdminReservationsPage({
         </Button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 rounded-lg bg-muted p-1">
-        <Link
-          href="/admin/reservations?view=upcoming"
-          className={`flex-1 rounded-md px-4 py-2 text-center text-sm font-medium transition-colors ${
-            tab === 'upcoming'
-              ? 'bg-background shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Upcoming ({upcoming.length})
-        </Link>
-        <Link
-          href="/admin/reservations?view=past"
-          className={`flex-1 rounded-md px-4 py-2 text-center text-sm font-medium transition-colors ${
-            tab === 'past'
-              ? 'bg-background shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Past ({past.length})
-        </Link>
-      </div>
+      <TabSwitcher tabs={[
+        { label: 'Upcoming', href: '/admin/reservations?view=upcoming', count: upcoming.length, active: tab === 'upcoming' },
+        { label: 'Past', href: '/admin/reservations?view=past', count: past.length, active: tab === 'past' },
+      ]} />
 
       <div className="overflow-x-auto">
         <Table>
@@ -91,7 +74,7 @@ export default async function AdminReservationsPage({
                 </TableCell>
                 <TableCell>{res.boat?.name}</TableCell>
                 <TableCell>{res.date}</TableCell>
-                <TableCell>{res.time_slot?.name} ({res.time_slot?.start_time}–{res.time_slot?.end_time})</TableCell>
+                <TableCell>{res.time_slot?.name} ({formatTime(res.time_slot?.start_time ?? '')}–{formatTime(res.time_slot?.end_time ?? '')})</TableCell>
                 <TableCell>
                   <Badge variant={res.status === 'active' ? 'default' : 'secondary'}>
                     {res.status}

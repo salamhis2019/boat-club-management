@@ -6,8 +6,9 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Calendar } from '@/components/ui/calendar'
-import { Clock, CheckCircle2, XCircle, Users, Phone, X } from 'lucide-react'
+import { Clock, CheckCircle2, XCircle, Users, Phone, X, CalendarDays } from 'lucide-react'
 import Image from 'next/image'
+import { formatDateString, formatTime } from '@/lib/helpers/date.helper'
 
 type Slot = {
   id: string
@@ -28,19 +29,13 @@ type BoatWithSlots = {
   slots: Slot[]
 }
 
-function formatDateString(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function formatTime(time: string): string {
-  const [h, m] = time.split(':')
-  const hour = parseInt(h, 10)
-  const suffix = hour >= 12 ? 'PM' : 'AM'
-  const display = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
-  return `${display}:${m} ${suffix}`
+type UserReservation = {
+  id: string
+  date: string
+  status: string
+  boat_id: string
+  boat: { name: string } | null
+  time_slot: { name: string; start_time: string; end_time: string } | null
 }
 
 export default function BookPage() {
@@ -57,11 +52,28 @@ export default function BookPage() {
   const [cancelling, setCancelling] = useState<string | null>(null)
   const [confirmingCancel, setConfirmingCancel] = useState<string | null>(null)
   const [dismissedError, setDismissedError] = useState(false)
+  const [myReservations, setMyReservations] = useState<UserReservation[]>([])
+  const [confirmingSidebarCancel, setConfirmingSidebarCancel] = useState<string | null>(null)
+  const [sidebarCancelling, setSidebarCancelling] = useState<string | null>(null)
+  const [highlightedBoat, setHighlightedBoat] = useState<string | null>(null)
 
   // Reset dismissed state when a new error comes in
   useEffect(() => {
     if (state?.error) setDismissedError(false)
   }, [state])
+
+  const refreshMyReservations = () => {
+    if (!userId) return
+    const supabase = createClient()
+    supabase
+      .from('reservations')
+      .select('id, date, status, boat:boats(name), time_slot:time_slots(name, start_time, end_time)')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .gte('date', todayStr)
+      .order('date', { ascending: true })
+      .then(({ data: res }) => setMyReservations((res as unknown as UserReservation[]) ?? []))
+  }
 
   const handleCancel = async (reservationId: string) => {
     setCancelling(reservationId)
@@ -74,6 +86,7 @@ export default function BookPage() {
       const res = await fetch(`/api/reservations/available?${params}`)
       const data = await res.json()
       setAvailability(data.availability ?? [])
+      refreshMyReservations()
     } finally {
       setCancelling(null)
     }
@@ -83,8 +96,20 @@ export default function BookPage() {
   const isSameDay = date === todayStr
 
   useEffect(() => {
-    createClient().auth.getUser().then(({ data }) => {
-      setUserId(data.user?.id ?? null)
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      const uid = data.user?.id ?? null
+      setUserId(uid)
+      if (uid) {
+        supabase
+          .from('reservations')
+          .select('id, date, status, boat_id, boat:boats(name), time_slot:time_slots(name, start_time, end_time)')
+          .eq('user_id', uid)
+          .eq('status', 'active')
+          .gte('date', todayStr)
+          .order('date', { ascending: true })
+          .then(({ data: res }) => setMyReservations((res as unknown as UserReservation[]) ?? []))
+      }
     })
   }, [])
 
@@ -145,6 +170,109 @@ export default function BookPage() {
               />
             </CardContent>
           </Card>
+
+          {myReservations.length > 0 && (
+            <Card className="mt-4 bg-muted/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                  <CalendarDays className="h-4 w-4 text-primary" />
+                  Your Upcoming Reservations
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {myReservations.map((res) => (
+                  <div
+                    key={res.id}
+                    className="rounded-md border border-border bg-background p-2.5"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="truncate text-sm font-medium">{res.boat?.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {res.date} &middot; {res.time_slot?.name} ({res.time_slot ? formatTime(res.time_slot.start_time) : ''} – {res.time_slot ? formatTime(res.time_slot.end_time) : ''})
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date(res.date + 'T00:00:00')
+                          setSelectedDay(d)
+                          setDate(res.date)
+                          setHighlightedBoat(res.boat_id)
+                          // Scroll after availability loads, retry if element not found yet
+                          const tryScroll = (attempts: number) => {
+                            const el = document.getElementById(`boat-${res.boat_id}`)
+                            if (el) {
+                              el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                            } else if (attempts > 0) {
+                              setTimeout(() => tryScroll(attempts - 1), 300)
+                            }
+                          }
+                          setTimeout(() => tryScroll(5), 300)
+                          // Remove highlight after 3 seconds
+                          setTimeout(() => setHighlightedBoat(null), 3500)
+                        }}
+                        className="cursor-pointer rounded-md border border-border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-muted"
+                      >
+                        View
+                      </button>
+                      {confirmingSidebarCancel !== res.id && (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmingSidebarCancel(res.id)}
+                          className="cursor-pointer rounded-md bg-red-100 px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-200 dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-900"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                    {confirmingSidebarCancel === res.id && (
+                      <div className="mt-2 flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/30">
+                        <p className="text-xs font-medium text-red-600 dark:text-red-400">
+                          Cancel this reservation?
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setConfirmingSidebarCancel(null)}
+                            disabled={sidebarCancelling === res.id}
+                            className="cursor-pointer rounded-md border border-border bg-white px-3 py-1 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50 dark:bg-background"
+                          >
+                            Keep
+                          </button>
+                          <button
+                            type="button"
+                            disabled={sidebarCancelling === res.id}
+                            onClick={async () => {
+                              setSidebarCancelling(res.id)
+                              try {
+                                await cancelReservation(res.id)
+                                setConfirmingSidebarCancel(null)
+                                refreshMyReservations()
+                                if (date) {
+                                  const params = new URLSearchParams({ date, user_id: userId! })
+                                  const response = await fetch(`/api/reservations/available?${params}`)
+                                  const data = await response.json()
+                                  setAvailability(data.availability ?? [])
+                                }
+                              } finally {
+                                setSidebarCancelling(null)
+                              }
+                            }}
+                            className="cursor-pointer rounded-md bg-red-500 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-red-600 disabled:opacity-50"
+                          >
+                            {sidebarCancelling === res.id ? 'Cancelling...' : 'Confirm'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Boats */}
@@ -172,7 +300,7 @@ export default function BookPage() {
           {!loading && availability.length > 0 && (
             <div className="grid gap-4 sm:grid-cols-2">
               {availability.map((boat) => (
-                <Card key={boat.id} className="flex flex-col overflow-hidden">
+                <Card key={boat.id} id={`boat-${boat.id}`} className={`flex flex-col overflow-hidden transition-all duration-500 ${highlightedBoat === boat.id ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
                   {boat.image_url && (
                     <div className="relative h-56 w-full">
                       <Image
