@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { loginSchema, resetPasswordSchema, updatePasswordSchema } from '@/lib/validations/auth'
 import { redirect } from 'next/navigation'
 
@@ -21,7 +22,7 @@ export async function login(_prevState: AuthState, formData: FormData): Promise<
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.auth.signInWithPassword({
+  const { error, data } = await supabase.auth.signInWithPassword({
     email: result.data.email,
     password: result.data.password,
   })
@@ -30,7 +31,16 @@ export async function login(_prevState: AuthState, formData: FormData): Promise<
     return { error: 'Invalid email or password' }
   }
 
-  redirect('/')
+  // Look up role to redirect to correct dashboard (bypass RLS with service client)
+  const serviceClient = createServiceClient()
+  const { data: profile } = await serviceClient
+    .from('users')
+    .select('role')
+    .eq('id', data.user.id)
+    .single()
+
+  const destination = profile?.role === 'admin' ? '/admin' : '/dashboard'
+  redirect(destination)
 }
 
 export async function logout(): Promise<void> {
