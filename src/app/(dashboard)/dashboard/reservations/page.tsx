@@ -2,39 +2,97 @@ import { createClient } from '@/lib/supabase/server'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatDateString, formatTime } from '@/lib/helpers/date.helper'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { cancelReservation } from '@/app/actions/reservations'
 import { TabSwitcher } from '@/components/tab-switcher'
+import { DataTable, type Column } from '@/components/data-table'
+import { parsePage, paginationRange, buildPaginationMeta, PAGE_SIZE } from '@/lib/pagination'
 import Link from 'next/link'
+
+type ReservationRow = {
+  id: string
+  date: string
+  status: string
+  boat: { name: string } | null
+  time_slot: { name: string; start_time: string; end_time: string } | null
+}
 
 export default async function MyReservationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>
+  searchParams: Promise<{ view?: string; page?: string }>
 }) {
-  const { view } = await searchParams
+  const { view, page: pageParam } = await searchParams
   const tab = view === 'past' ? 'past' : 'upcoming'
+  const page = parsePage({ page: pageParam })
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-
-  const { data: reservations } = await supabase
-    .from('reservations')
-    .select('*, boat:boats(name), time_slot:time_slots(name, start_time, end_time)')
-    .eq('user_id', user!.id)
-    .order('date', { ascending: true })
-
   const today = formatDateString(new Date())
-  const upcoming = (reservations ?? []).filter((r) => r.date >= today).sort((a, b) => a.date.localeCompare(b.date))
-  const past = (reservations ?? []).filter((r) => r.date < today).sort((a, b) => b.date.localeCompare(a.date))
-  const displayed = tab === 'upcoming' ? upcoming : past
+
+  // Count queries for tab badges
+  const [{ count: upcomingCount }, { count: pastCount }] = await Promise.all([
+    supabase.from('reservations').select('*', { count: 'exact', head: true }).eq('user_id', user!.id).gte('date', today),
+    supabase.from('reservations').select('*', { count: 'exact', head: true }).eq('user_id', user!.id).lt('date', today),
+  ])
+
+  // Paginated query for current tab
+  const { from, to } = paginationRange(page, PAGE_SIZE)
+  let query = supabase
+    .from('reservations')
+    .select('*, boat:boats(name), time_slot:time_slots(name, start_time, end_time)', { count: 'exact' })
+    .eq('user_id', user!.id)
+
+  if (tab === 'upcoming') {
+    query = query.gte('date', today).order('date', { ascending: true })
+  } else {
+    query = query.lt('date', today).order('date', { ascending: false })
+  }
+
+  const { data: reservations, count } = await query.range(from, to)
+
+  const displayed = (reservations ?? []) as ReservationRow[]
+  const total = count ?? 0
+  const pagination = buildPaginationMeta(page, total)
+
+  const columns: Column<ReservationRow>[] = [
+    {
+      header: 'Boat',
+      cell: (row) => <span className="font-medium">{row.boat?.name}</span>,
+    },
+    {
+      header: 'Date',
+      cell: (row) => row.date,
+    },
+    {
+      header: 'Time Slot',
+      cell: (row) => (
+        <>
+          {row.time_slot?.name} ({formatTime(row.time_slot?.start_time ?? '')}–{formatTime(row.time_slot?.end_time ?? '')})
+        </>
+      ),
+    },
+    {
+      header: 'Status',
+      cell: (row) => (
+        <Badge variant={row.status === 'active' ? 'default' : 'secondary'}>
+          {row.status}
+        </Badge>
+      ),
+    },
+    {
+      header: 'Actions',
+      className: 'text-right',
+      cell: (row) => (
+        <>
+          {row.status === 'active' && row.date >= today && (
+            <form action={cancelReservation.bind(null, row.id)}>
+              <Button variant="destructive" size="sm">Cancel</Button>
+            </form>
+          )}
+        </>
+      ),
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -46,63 +104,21 @@ export default async function MyReservationsPage({
       </div>
 
       <TabSwitcher tabs={[
-        { label: 'Upcoming', href: '/dashboard/reservations?view=upcoming', count: upcoming.length, active: tab === 'upcoming' },
-        { label: 'Past', href: '/dashboard/reservations?view=past', count: past.length, active: tab === 'past' },
+        { label: 'Upcoming', href: '/dashboard/reservations?view=upcoming', count: upcomingCount ?? 0, active: tab === 'upcoming' },
+        { label: 'Past', href: '/dashboard/reservations?view=past', count: pastCount ?? 0, active: tab === 'past' },
       ]} />
 
-      <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Boat</TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead>Time Slot</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {displayed.length > 0 ? (
-            displayed.map((res) => {
-              const isFuture = res.date >= today
-              const canCancel = res.status === 'active' && isFuture
-
-              return (
-                <TableRow key={res.id}>
-                  <TableCell className="font-medium">{res.boat?.name}</TableCell>
-                  <TableCell>{res.date}</TableCell>
-                  <TableCell>{res.time_slot?.name} ({formatTime(res.time_slot?.start_time ?? '')}–{formatTime(res.time_slot?.end_time ?? '')})</TableCell>
-                  <TableCell>
-                    <Badge variant={res.status === 'active' ? 'default' : 'secondary'}>
-                      {res.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {canCancel && (
-                      <form action={cancelReservation.bind(null, res.id)}>
-                        <Button variant="destructive" size="sm">
-                          Cancel
-                        </Button>
-                      </form>
-                    )}
-                  </TableCell>
-                </TableRow>
-              )
-            })
-          ) : (
-            <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">
-                {tab === 'upcoming' ? (
-                  <>No upcoming reservations. <Link href="/dashboard/book" className="underline">Book a boat</Link> to get started.</>
-                ) : (
-                  'No past reservations.'
-                )}
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-      </div>
+      <DataTable
+        columns={columns}
+        data={displayed}
+        emptyMessage={
+          tab === 'upcoming'
+            ? 'No upcoming reservations. Book a boat to get started.'
+            : 'No past reservations.'
+        }
+        pagination={pagination}
+        baseUrl={`/dashboard/reservations?view=${tab}`}
+      />
     </div>
   )
 }
