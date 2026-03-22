@@ -22,7 +22,6 @@ export async function createCharge(_prevState: ChargeActionState, formData: Form
 
   const result = createChargeSchema.safeParse(raw)
   if (!result.success) {
-    console.error('createCharge validation errors:', JSON.stringify(result.error.issues))
     return { error: result.error.issues[0].message }
   }
 
@@ -34,6 +33,17 @@ export async function createCharge(_prevState: ChargeActionState, formData: Form
   }
 
   const serviceClient = createServiceClient()
+
+  // Check admin role
+  const { data: profile } = await serviceClient
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role !== 'admin') {
+    return { error: 'Only admins can create charges.' }
+  }
 
   // Generate invoice number: INV-YYYY-XXXX
   const year = new Date().getFullYear()
@@ -138,7 +148,24 @@ export async function retryCharge(_prevState: ChargeActionState, formData: FormD
     return { error: result.error.issues[0].message }
   }
 
+  // Verify admin
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: 'You must be logged in.' }
+  }
+
   const serviceClient = createServiceClient()
+
+  const { data: profile } = await serviceClient
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role !== 'admin') {
+    return { error: 'Only admins can retry charges.' }
+  }
 
   const { data: charge } = await serviceClient
     .from('charges')
@@ -212,7 +239,19 @@ export async function retryCharge(_prevState: ChargeActionState, formData: FormD
 }
 
 export async function cancelCharge(id: string): Promise<void> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
   const serviceClient = createServiceClient()
+
+  const { data: profile } = await serviceClient
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role !== 'admin') return
 
   await serviceClient
     .from('charges')

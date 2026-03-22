@@ -26,10 +26,26 @@ export async function ensureStripeCustomer(userId: string): Promise<string> {
     metadata: { supabase_user_id: user.id },
   })
 
-  await supabase
+  // Use conditional update to prevent race condition — only set if still null
+  const { data: updated } = await supabase
     .from('users')
     .update({ stripe_customer_id: customer.id })
     .eq('id', userId)
+    .is('stripe_customer_id', null)
+    .select('stripe_customer_id')
+    .single()
+
+  if (!updated) {
+    // Another request already set it — use theirs and clean up ours
+    const { data: existing } = await supabase
+      .from('users')
+      .select('stripe_customer_id')
+      .eq('id', userId)
+      .single()
+
+    await stripe.customers.del(customer.id)
+    return existing!.stripe_customer_id!
+  }
 
   return customer.id
 }

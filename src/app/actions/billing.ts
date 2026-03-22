@@ -20,8 +20,7 @@ export async function createSetupIntent(): Promise<{ clientSecret: string | null
     })
     return { clientSecret: setupIntent.client_secret }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    console.error('createSetupIntent error:', message)
+    const message = err instanceof Error ? err.message : 'Failed to initialize payment setup.'
     return { clientSecret: null, error: message }
   }
 }
@@ -39,7 +38,6 @@ export async function getPaymentMethods() {
     .single()
 
   if (!profile?.stripe_customer_id) {
-    console.error('getPaymentMethods: no stripe_customer_id for user', user.id)
     return []
   }
 
@@ -51,8 +49,6 @@ export async function getPaymentMethods() {
 
     const allMethods = [...cardMethods.data, ...linkMethods.data]
 
-    console.log('getPaymentMethods: found', allMethods.length, 'methods for customer', profile.stripe_customer_id)
-
     return allMethods.map((pm) => ({
       id: pm.id,
       brand: pm.type === 'link' ? 'link' : (pm.card?.brand ?? 'unknown'),
@@ -60,8 +56,7 @@ export async function getPaymentMethods() {
       exp_month: pm.card?.exp_month ?? 0,
       exp_year: pm.card?.exp_year ?? 0,
     }))
-  } catch (err) {
-    console.error('getPaymentMethods error:', err instanceof Error ? err.message : err)
+  } catch {
     return []
   }
 }
@@ -98,7 +93,24 @@ export async function deletePaymentMethod(paymentMethodId: string): Promise<{ er
     return { error: 'You must be logged in.' }
   }
 
+  // Verify this PM belongs to the user's Stripe customer
+  const serviceClient = createServiceClient()
+  const { data: profile } = await serviceClient
+    .from('users')
+    .select('stripe_customer_id')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile?.stripe_customer_id) {
+    return { error: 'No payment account found.' }
+  }
+
   try {
+    const pm = await stripe.paymentMethods.retrieve(paymentMethodId)
+    if (pm.customer !== profile.stripe_customer_id) {
+      return { error: 'Payment method not found.' }
+    }
+
     await stripe.paymentMethods.detach(paymentMethodId)
     revalidatePath('/dashboard/billing')
     return {}
@@ -126,6 +138,11 @@ export async function setDefaultPaymentMethod(paymentMethodId: string): Promise<
   }
 
   try {
+    const pm = await stripe.paymentMethods.retrieve(paymentMethodId)
+    if (pm.customer !== profile.stripe_customer_id) {
+      return { error: 'Payment method not found.' }
+    }
+
     await stripe.customers.update(profile.stripe_customer_id, {
       invoice_settings: { default_payment_method: paymentMethodId },
     })
