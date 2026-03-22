@@ -46,6 +46,20 @@ export async function validateBookingRules(
     }
   }
 
+  // Rule: No unpaid fees (members only)
+  if (!isAdmin) {
+    const { data: unpaidCharges } = await supabase
+      .from('charges')
+      .select('id')
+      .eq('user_id', userId)
+      .in('status', ['pending', 'failed'])
+      .limit(1)
+
+    if (unpaidCharges && unpaidCharges.length > 0) {
+      return { valid: false, error: 'You have unpaid fees. Please settle your balance before booking.' }
+    }
+  }
+
   // Rule 8: Cannot book blocked dates
   const { data: blockedDate } = await supabase
     .from('blocked_dates')

@@ -20,6 +20,8 @@ import {
   ClockIcon,
   CalendarDaysIcon,
   BookOpenIcon,
+  DollarSignIcon,
+  CreditCardIcon,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -34,12 +36,14 @@ const adminLinks: NavLink[] = [
   { href: '/admin/boats', label: 'Boats', icon: ShipIcon },
   { href: '/admin/time-slots', label: 'Time Slots', icon: ClockIcon },
   { href: '/admin/reservations', label: 'Reservations', icon: CalendarDaysIcon },
+  { href: '/admin/charges', label: 'Charges', icon: DollarSignIcon },
 ]
 
 const memberLinks: NavLink[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboardIcon },
   { href: '/dashboard/book', label: 'Book a Boat', icon: BookOpenIcon },
   { href: '/dashboard/reservations', label: 'My Reservations', icon: CalendarDaysIcon },
+  { href: '/dashboard/billing', label: 'Billing', icon: CreditCardIcon },
 ]
 
 type SidebarProps = {

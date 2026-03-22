@@ -76,6 +76,7 @@ export interface Charge {
   type: ChargeType
   description: string
   status: ChargeStatus
+  invoice_number: string | null
   stripe_payment_intent_id: string | null
   retry_count: number
   created_by: string
