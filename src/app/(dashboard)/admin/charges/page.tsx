@@ -1,40 +1,54 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { cancelCharge } from '@/app/actions/charges'
 import { TabSwitcher } from '@/components/tab-switcher'
+import { DataTable, type Column } from '@/components/data-table'
+import { parsePage, paginationRange, buildPaginationMeta, PAGE_SIZE } from '@/lib/pagination'
 import Link from 'next/link'
 import { RetryChargeButton } from '@/components/billing/retry-charge-button'
+
+type ChargeRow = {
+  id: string
+  invoice_number: string | null
+  user: { first_name: string; last_name: string; email: string } | null
+  amount: number
+  type: string
+  description: string
+  status: string
+  created_at: string
+}
 
 export default async function AdminChargesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>
+  searchParams: Promise<{ view?: string; page?: string }>
 }) {
-  const { view } = await searchParams
+  const { view, page: pageParam } = await searchParams
   const tab = view === 'paid' ? 'paid' : view === 'failed' ? 'failed' : 'pending'
+  const page = parsePage({ page: pageParam })
 
   const supabase = createServiceClient()
 
-  const { data: charges } = await supabase
+  // Count queries for tab badges (lightweight)
+  const [{ count: pendingCount }, { count: paidCount }, { count: failedCount }] = await Promise.all([
+    supabase.from('charges').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    supabase.from('charges').select('*', { count: 'exact', head: true }).eq('status', 'paid'),
+    supabase.from('charges').select('*', { count: 'exact', head: true }).eq('status', 'failed'),
+  ])
+
+  // Paginated query for current tab
+  const { from, to } = paginationRange(page, PAGE_SIZE)
+  const { data: charges, count } = await supabase
     .from('charges')
-    .select('*, user:users!charges_user_id_fkey(first_name, last_name, email)')
+    .select('*, user:users!charges_user_id_fkey(first_name, last_name, email)', { count: 'exact' })
+    .eq('status', tab)
     .order('created_at', { ascending: false })
+    .range(from, to)
 
-  const allCharges = charges ?? []
-  const pending = allCharges.filter((c) => c.status === 'pending')
-  const paid = allCharges.filter((c) => c.status === 'paid')
-  const failed = allCharges.filter((c) => c.status === 'failed')
-
-  const displayed = tab === 'paid' ? paid : tab === 'failed' ? failed : pending
+  const displayed = (charges ?? []) as ChargeRow[]
+  const total = count ?? 0
+  const pagination = buildPaginationMeta(page, total)
 
   const statusVariant = (status: string) => {
     switch (status) {
@@ -43,6 +57,67 @@ export default async function AdminChargesPage({
       default: return 'secondary' as const
     }
   }
+
+  const columns: Column<ChargeRow>[] = [
+    {
+      header: 'Invoice',
+      cell: (row) => (
+        <span className="font-mono text-xs text-muted-foreground">
+          {row.invoice_number ?? '—'}
+        </span>
+      ),
+    },
+    {
+      header: 'Member',
+      cell: (row) => (
+        <div>
+          <div className="font-medium">
+            {row.user?.first_name} {row.user?.last_name}
+          </div>
+          <div className="text-xs text-muted-foreground">{row.user?.email}</div>
+        </div>
+      ),
+    },
+    {
+      header: 'Amount',
+      cell: (row) => <span className="font-medium">${row.amount.toFixed(2)}</span>,
+    },
+    {
+      header: 'Type',
+      cell: (row) => <span className="capitalize">{row.type}</span>,
+    },
+    {
+      header: 'Description',
+      className: 'max-w-[200px] truncate',
+      cell: (row) => row.description,
+    },
+    {
+      header: 'Status',
+      cell: (row) => <Badge variant={statusVariant(row.status)}>{row.status}</Badge>,
+    },
+    {
+      header: 'Date',
+      cell: (row) => (
+        <span className="text-sm text-muted-foreground">
+          {new Date(row.created_at).toLocaleDateString()}
+        </span>
+      ),
+    },
+    {
+      header: 'Actions',
+      className: 'text-right',
+      cell: (row) => (
+        <div className="flex justify-end gap-2">
+          {row.status === 'failed' && <RetryChargeButton chargeId={row.id} />}
+          {row.status === 'pending' && (
+            <form action={cancelCharge.bind(null, row.id)}>
+              <Button variant="destructive" size="sm">Cancel</Button>
+            </form>
+          )}
+        </div>
+      ),
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -54,77 +129,18 @@ export default async function AdminChargesPage({
       </div>
 
       <TabSwitcher tabs={[
-        { label: 'Pending', href: '/admin/charges?view=pending', count: pending.length, active: tab === 'pending' },
-        { label: 'Paid', href: '/admin/charges?view=paid', count: paid.length, active: tab === 'paid' },
-        { label: 'Failed', href: '/admin/charges?view=failed', count: failed.length, active: tab === 'failed' },
+        { label: 'Pending', href: '/admin/charges?view=pending', count: pendingCount ?? 0, active: tab === 'pending' },
+        { label: 'Paid', href: '/admin/charges?view=paid', count: paidCount ?? 0, active: tab === 'paid' },
+        { label: 'Failed', href: '/admin/charges?view=failed', count: failedCount ?? 0, active: tab === 'failed' },
       ]} />
 
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Invoice</TableHead>
-              <TableHead>Member</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {displayed.length > 0 ? (
-              displayed.map((charge) => (
-                <TableRow key={charge.id}>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {charge.invoice_number ?? '—'}
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">
-                        {charge.user?.first_name} {charge.user?.last_name}
-                      </div>
-                      <div className="text-xs text-muted-foreground">{charge.user?.email}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-medium">${charge.amount.toFixed(2)}</TableCell>
-                  <TableCell className="capitalize">{charge.type}</TableCell>
-                  <TableCell className="max-w-[200px] truncate">{charge.description}</TableCell>
-                  <TableCell>
-                    <Badge variant={statusVariant(charge.status)}>
-                      {charge.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {new Date(charge.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      {charge.status === 'failed' && (
-                        <RetryChargeButton chargeId={charge.id} />
-                      )}
-                      {charge.status === 'pending' && (
-                        <form action={cancelCharge.bind(null, charge.id)}>
-                          <Button variant="destructive" size="sm">
-                            Cancel
-                          </Button>
-                        </form>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground">
-                  No {tab} charges.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <DataTable
+        columns={columns}
+        data={displayed}
+        emptyMessage={`No ${tab} charges.`}
+        pagination={pagination}
+        baseUrl={`/admin/charges?view=${tab}`}
+      />
     </div>
   )
 }

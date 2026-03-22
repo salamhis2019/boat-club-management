@@ -2,18 +2,12 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PaymentMethodsList } from '@/components/billing/payment-methods-list'
 import { PayChargeButton } from '@/components/billing/pay-charge-button'
 import { getPaymentMethods, getDefaultPaymentMethodId } from '@/app/actions/billing'
+import { DataTable, type Column } from '@/components/data-table'
+import { parsePage, paginationRange, buildPaginationMeta, PAGE_SIZE } from '@/lib/pagination'
 import { PlusIcon } from 'lucide-react'
 import Link from 'next/link'
 
@@ -28,16 +22,40 @@ function AddCardButton() {
   )
 }
 
-export default async function BillingPage() {
+type ChargeRow = {
+  id: string
+  invoice_number: string | null
+  description: string
+  type: string
+  amount: number
+  status: string
+  created_at: string
+}
+
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>
+}) {
+  const { page: pageParam } = await searchParams
+  const page = parsePage({ page: pageParam })
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   const serviceClient = createServiceClient()
-  const { data: charges } = await serviceClient
+  const { from, to } = paginationRange(page, PAGE_SIZE)
+
+  const { data: charges, count } = await serviceClient
     .from('charges')
-    .select('*')
+    .select('*', { count: 'exact' })
     .eq('user_id', user!.id)
     .order('created_at', { ascending: false })
+    .range(from, to)
+
+  const displayed = (charges ?? []) as ChargeRow[]
+  const total = count ?? 0
+  const pagination = buildPaginationMeta(page, total)
 
   const paymentMethods = await getPaymentMethods()
   const defaultPmId = await getDefaultPaymentMethodId()
@@ -49,6 +67,52 @@ export default async function BillingPage() {
       default: return 'secondary' as const
     }
   }
+
+  const columns: Column<ChargeRow>[] = [
+    {
+      header: 'Invoice',
+      cell: (row) => (
+        <span className="font-mono text-xs text-muted-foreground">
+          {row.invoice_number ?? '—'}
+        </span>
+      ),
+    },
+    {
+      header: 'Description',
+      cell: (row) => <span className="font-medium">{row.description}</span>,
+    },
+    {
+      header: 'Type',
+      cell: (row) => <span className="capitalize">{row.type}</span>,
+    },
+    {
+      header: 'Amount',
+      cell: (row) => `$${row.amount.toFixed(2)}`,
+    },
+    {
+      header: 'Status',
+      cell: (row) => <Badge variant={statusVariant(row.status)}>{row.status}</Badge>,
+    },
+    {
+      header: 'Date',
+      cell: (row) => (
+        <span className="text-sm text-muted-foreground">
+          {new Date(row.created_at).toLocaleDateString()}
+        </span>
+      ),
+    },
+    {
+      header: 'Actions',
+      className: 'text-right',
+      cell: (row) => (
+        <>
+          {(row.status === 'pending' || row.status === 'failed') && (
+            <PayChargeButton chargeId={row.id} />
+          )}
+        </>
+      ),
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -77,54 +141,13 @@ export default async function BillingPage() {
           <CardTitle className="text-lg">Charges</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(charges ?? []).length > 0 ? (
-                  (charges ?? []).map((charge) => (
-                    <TableRow key={charge.id}>
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        {charge.invoice_number ?? '—'}
-                      </TableCell>
-                      <TableCell className="font-medium">{charge.description}</TableCell>
-                      <TableCell className="capitalize">{charge.type}</TableCell>
-                      <TableCell>${charge.amount.toFixed(2)}</TableCell>
-                      <TableCell>
-                        <Badge variant={statusVariant(charge.status)}>
-                          {charge.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {new Date(charge.created_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {(charge.status === 'pending' || charge.status === 'failed') && (
-                          <PayChargeButton chargeId={charge.id} />
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground">
-                      No charges yet.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable
+            columns={columns}
+            data={displayed}
+            emptyMessage="No charges yet."
+            pagination={pagination}
+            baseUrl="/dashboard/billing"
+          />
         </CardContent>
       </Card>
     </div>
