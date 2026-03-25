@@ -22,6 +22,8 @@ import {
   BookOpenIcon,
   DollarSignIcon,
   CreditCardIcon,
+  UsersIcon,
+  FileTextIcon,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -33,10 +35,12 @@ type NavLink = {
 
 const adminLinks: NavLink[] = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboardIcon },
+  { href: '/admin/users', label: 'Users', icon: UsersIcon },
   { href: '/admin/boats', label: 'Boats', icon: ShipIcon },
   { href: '/admin/time-slots', label: 'Time Slots', icon: ClockIcon },
   { href: '/admin/reservations', label: 'Reservations', icon: CalendarDaysIcon },
   { href: '/admin/charges', label: 'Charges', icon: DollarSignIcon },
+  { href: '/admin/documents', label: 'Documents', icon: FileTextIcon },
 ]
 
 const memberLinks: NavLink[] = [
@@ -44,6 +48,7 @@ const memberLinks: NavLink[] = [
   { href: '/dashboard/book', label: 'Book a Boat', icon: BookOpenIcon },
   { href: '/dashboard/reservations', label: 'My Reservations', icon: CalendarDaysIcon },
   { href: '/dashboard/billing', label: 'Billing', icon: CreditCardIcon },
+  { href: '/dashboard/documents', label: 'Documents', icon: FileTextIcon },
 ]
 
 type SidebarProps = {

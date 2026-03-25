@@ -7,7 +7,7 @@ export async function GET() {
   const { data: members } = await supabase
     .from('users')
     .select('id, first_name, last_name, email')
-    .in('role', ['member', 'sub_user'])
+    .eq('role', 'member')
     .eq('is_active', true)
     .order('last_name')
 

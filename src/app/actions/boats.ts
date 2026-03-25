@@ -3,6 +3,7 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { boatSchema } from '@/lib/validations/boats'
 import { revalidatePath } from 'next/cache'
+import { BUCKETS } from '@/lib/constants/buckets.const'
 import { redirect } from 'next/navigation'
 
 export type BoatActionState = {
@@ -25,7 +26,7 @@ async function uploadImage(file: File): Promise<string | null> {
   const fileName = `${crypto.randomUUID()}.${ext}`
 
   const { error } = await supabase.storage
-    .from('boat-images')
+    .from(BUCKETS.BOAT_IMAGES)
     .upload(fileName, file)
 
   if (error) {
@@ -33,7 +34,7 @@ async function uploadImage(file: File): Promise<string | null> {
   }
 
   const { data } = supabase.storage
-    .from('boat-images')
+    .from(BUCKETS.BOAT_IMAGES)
     .getPublicUrl(fileName)
 
   return data.publicUrl
