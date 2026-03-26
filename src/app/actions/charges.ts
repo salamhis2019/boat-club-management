@@ -5,7 +5,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { ROLES } from '@/lib/constants/roles.const'
 import { isValidUuid } from '@/lib/validations/common'
 import { createChargeSchema, retryChargeSchema } from '@/lib/validations/charges'
-import { stripe, ensureStripeCustomer } from '@/lib/stripe'
+import { getStripe, ensureStripeCustomer } from '@/lib/stripe'
 import { revalidatePath } from 'next/cache'
 
 export type ChargeActionState = {
@@ -89,6 +89,7 @@ export async function createCharge(_prevState: ChargeActionState, formData: Form
 
   // Attempt auto-charge with saved payment method
   try {
+    const stripe = await getStripe()
     const customer = await stripe.customers.retrieve(customerId)
     if (customer.deleted) {
       return { success: 'Charge created. Member has no saved payment method — they will see it on their billing page.' }
@@ -190,6 +191,7 @@ export async function retryCharge(_prevState: ChargeActionState, formData: FormD
     return { error: 'Failed to set up payment for this user.' }
   }
 
+  const stripe = await getStripe()
   const customer = await stripe.customers.retrieve(customerId)
   if (customer.deleted) {
     return { error: 'Customer account has been deleted in Stripe.' }
@@ -303,6 +305,7 @@ export async function payCharge(_prevState: ChargeActionState, formData: FormDat
     return { error: 'Failed to set up payment.' }
   }
 
+  const stripe = await getStripe()
   const customer = await stripe.customers.retrieve(customerId)
   if (customer.deleted) {
     return { error: 'Payment account not found.' }

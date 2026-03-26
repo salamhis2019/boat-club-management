@@ -1,12 +1,12 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { cancelCharge } from '@/app/actions/charges'
 import { TabSwitcher } from '@/components/tab-switcher'
 import { DataTable, type Column } from '@/components/data-table'
 import { parsePage, paginationRange, buildPaginationMeta, PAGE_SIZE } from '@/lib/pagination'
 import Link from 'next/link'
 import { RetryChargeButton } from '@/components/billing/retry-charge-button'
+import { CancelChargeButton } from '@/components/billing/cancel-charge-button'
 
 type ChargeRow = {
   id: string
@@ -110,9 +110,7 @@ export default async function AdminChargesPage({
         <div className="flex justify-end gap-2">
           {row.status === 'failed' && <RetryChargeButton chargeId={row.id} />}
           {row.status === 'pending' && (
-            <form action={cancelCharge.bind(null, row.id)}>
-              <Button variant="destructive" size="sm">Cancel</Button>
-            </form>
+            <CancelChargeButton chargeId={row.id} />
           )}
         </div>
       ),

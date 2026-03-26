@@ -1,4 +1,4 @@
-import { stripe } from '@/lib/stripe'
+import { getStripe, getStripeKeys } from '@/lib/stripe'
 import { createServiceClient } from '@/lib/supabase/service'
 import { NextResponse } from 'next/server'
 
@@ -12,9 +12,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
   }
 
+  const stripe = await getStripe()
+  const { webhookSecret } = await getStripeKeys()
+
   let event
   try {
-    event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!)
+    event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
   } catch {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
@@ -74,7 +77,8 @@ export async function POST(request: Request) {
 
       if (customerId && pmId) {
         // If customer has no default PM, set this one as default
-        const customer = await stripe.customers.retrieve(typeof customerId === 'string' ? customerId : customerId.id)
+        const cid = typeof customerId === 'string' ? customerId : customerId.id
+        const customer = await stripe.customers.retrieve(cid)
         if (!customer.deleted && !customer.invoice_settings?.default_payment_method) {
           await stripe.customers.update(customer.id, {
             invoice_settings: { default_payment_method: typeof pmId === 'string' ? pmId : pmId.id },
