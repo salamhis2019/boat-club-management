@@ -2,6 +2,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { ROLES } from '@/lib/constants/roles.const'
+import { isValidUuid } from '@/lib/validations/common'
 import { createChargeSchema, retryChargeSchema } from '@/lib/validations/charges'
 import { stripe, ensureStripeCustomer } from '@/lib/stripe'
 import { revalidatePath } from 'next/cache'
@@ -41,7 +43,7 @@ export async function createCharge(_prevState: ChargeActionState, formData: Form
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'admin') {
+  if (profile?.role !== ROLES.ADMIN) {
     return { error: 'Only admins can create charges.' }
   }
 
@@ -163,7 +165,7 @@ export async function retryCharge(_prevState: ChargeActionState, formData: FormD
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'admin') {
+  if (profile?.role !== ROLES.ADMIN) {
     return { error: 'Only admins can retry charges.' }
   }
 
@@ -239,6 +241,8 @@ export async function retryCharge(_prevState: ChargeActionState, formData: FormD
 }
 
 export async function cancelCharge(id: string): Promise<void> {
+  if (!isValidUuid(id)) return
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
@@ -251,7 +255,7 @@ export async function cancelCharge(id: string): Promise<void> {
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'admin') return
+  if (profile?.role !== ROLES.ADMIN) return
 
   await serviceClient
     .from('charges')
@@ -265,7 +269,7 @@ export async function cancelCharge(id: string): Promise<void> {
 
 export async function payCharge(_prevState: ChargeActionState, formData: FormData): Promise<ChargeActionState> {
   const chargeId = formData.get('charge_id') as string
-  if (!chargeId) {
+  if (!chargeId || !isValidUuid(chargeId)) {
     return { error: 'Missing charge ID.' }
   }
 

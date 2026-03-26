@@ -2,6 +2,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { ROLES } from '@/lib/constants/roles.const'
+import { isValidUuid } from '@/lib/validations/common'
 import { uploadDocumentSchema } from '@/lib/validations/documents'
 import { revalidatePath } from 'next/cache'
 import { BUCKETS } from '@/lib/constants/buckets.const'
@@ -13,6 +15,12 @@ export type DocumentActionState = {
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+const MIME_TO_EXT: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'application/pdf': 'pdf',
+}
 
 export async function uploadDocument(_prevState: DocumentActionState, formData: FormData): Promise<DocumentActionState> {
   const raw = {
@@ -52,7 +60,7 @@ export async function uploadDocument(_prevState: DocumentActionState, formData: 
     .eq('id', user.id)
     .single()
 
-  if (!profile || profile.role !== 'member') {
+  if (!profile || profile.role !== ROLES.MEMBER) {
     return { error: 'Only members can upload documents.' }
   }
 
@@ -70,7 +78,7 @@ export async function uploadDocument(_prevState: DocumentActionState, formData: 
   }
 
   // Upload file
-  const ext = file.name.split('.').pop()
+  const ext = MIME_TO_EXT[file.type] ?? 'bin'
   const storagePath = `${user.id}/${crypto.randomUUID()}.${ext}`
 
   const { error: uploadError } = await serviceClient.storage
@@ -107,6 +115,10 @@ export async function uploadDocument(_prevState: DocumentActionState, formData: 
 }
 
 export async function approveDocument(documentId: string): Promise<{ error?: string }> {
+  if (!isValidUuid(documentId)) {
+    return { error: 'Invalid document ID.' }
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -122,7 +134,7 @@ export async function approveDocument(documentId: string): Promise<{ error?: str
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'admin') {
+  if (profile?.role !== ROLES.ADMIN) {
     return { error: 'Only admins can approve documents.' }
   }
 
@@ -168,6 +180,10 @@ export async function approveDocument(documentId: string): Promise<{ error?: str
 }
 
 export async function rejectDocument(documentId: string): Promise<{ error?: string }> {
+  if (!isValidUuid(documentId)) {
+    return { error: 'Invalid document ID.' }
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -183,7 +199,7 @@ export async function rejectDocument(documentId: string): Promise<{ error?: stri
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'admin') {
+  if (profile?.role !== ROLES.ADMIN) {
     return { error: 'Only admins can reject documents.' }
   }
 

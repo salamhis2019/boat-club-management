@@ -82,7 +82,6 @@ export default function BookPage() {
       setConfirmingCancel(null)
       // Re-fetch availability after cancel
       const params = new URLSearchParams({ date })
-      if (userId) params.set('user_id', userId)
       const res = await fetch(`/api/reservations/available?${params}`)
       const data = await res.json()
       setAvailability(data.availability ?? [])
@@ -129,7 +128,7 @@ export default function BookPage() {
     }
     setLoading(true)
     setSelected(null)
-    const params = new URLSearchParams({ date, user_id: userId })
+    const params = new URLSearchParams({ date })
     fetch(`/api/reservations/available?${params}`)
       .then((res) => res.json())
       .then((data) => setAvailability(data.availability ?? []))
@@ -252,7 +251,7 @@ export default function BookPage() {
                                 setConfirmingSidebarCancel(null)
                                 refreshMyReservations()
                                 if (date) {
-                                  const params = new URLSearchParams({ date, user_id: userId! })
+                                  const params = new URLSearchParams({ date })
                                   const response = await fetch(`/api/reservations/available?${params}`)
                                   const data = await response.json()
                                   setAvailability(data.availability ?? [])

@@ -1,6 +1,8 @@
 'use server'
 
 import { createServiceClient } from '@/lib/supabase/service'
+import { requireAdmin } from '@/lib/supabase/auth'
+import { isValidUuid } from '@/lib/validations/common'
 import { timeSlotSchema } from '@/lib/validations/time-slots'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -10,6 +12,12 @@ export type TimeSlotActionState = {
 } | null
 
 export async function createTimeSlot(_prevState: TimeSlotActionState, formData: FormData): Promise<TimeSlotActionState> {
+  try {
+    await requireAdmin()
+  } catch {
+    return { error: 'Only admins can manage time slots.' }
+  }
+
   const raw = {
     name: formData.get('name') as string,
     start_time: formData.get('start_time') as string,
@@ -36,6 +44,14 @@ export async function createTimeSlot(_prevState: TimeSlotActionState, formData: 
 }
 
 export async function toggleTimeSlotActive(id: string): Promise<void> {
+  if (!isValidUuid(id)) return
+
+  try {
+    await requireAdmin()
+  } catch {
+    return
+  }
+
   const supabase = createServiceClient()
 
   const { data: slot } = await supabase
@@ -55,6 +71,14 @@ export async function toggleTimeSlotActive(id: string): Promise<void> {
 }
 
 export async function deleteTimeSlot(id: string): Promise<void> {
+  if (!isValidUuid(id)) return
+
+  try {
+    await requireAdmin()
+  } catch {
+    return
+  }
+
   const supabase = createServiceClient()
 
   await supabase

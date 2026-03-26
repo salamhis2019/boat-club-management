@@ -2,6 +2,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { ROLES } from '@/lib/constants/roles.const'
+import { isValidUuid } from '@/lib/validations/common'
 import { reservationSchema, reservationOnBehalfSchema } from '@/lib/validations/reservations'
 import { validateBookingRules } from '@/lib/reservations'
 import { revalidatePath } from 'next/cache'
@@ -83,6 +85,18 @@ export async function createReservationOnBehalf(_prevState: ReservationActionSta
     return { error: 'You must be logged in.' }
   }
 
+  // Verify caller is an admin
+  const serviceClient = createServiceClient()
+  const { data: profile } = await serviceClient
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role !== ROLES.ADMIN) {
+    return { error: 'Only admins can book on behalf of members.' }
+  }
+
   // Validate booking rules (admin bypass for 24h/docs/membership)
   const validation = await validateBookingRules(
     result.data.user_id,
@@ -97,7 +111,6 @@ export async function createReservationOnBehalf(_prevState: ReservationActionSta
   }
 
   // Create reservation
-  const serviceClient = createServiceClient()
   const { error } = await serviceClient.from('reservations').insert({
     user_id: result.data.user_id,
     boat_id: result.data.boat_id,
@@ -117,15 +130,38 @@ export async function createReservationOnBehalf(_prevState: ReservationActionSta
 }
 
 export async function cancelReservation(id: string): Promise<void> {
+  if (!isValidUuid(id)) return
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
   const serviceClient = createServiceClient()
 
-  await serviceClient
+  // Check if user is admin
+  const { data: profile } = await serviceClient
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  const isAdmin = profile?.role === ROLES.ADMIN
+
+  // Build the update query
+  let query = serviceClient
     .from('reservations')
     .update({
       status: 'cancelled',
       cancelled_at: new Date().toISOString(),
     })
     .eq('id', id)
+
+  // Non-admins can only cancel their own reservations
+  if (!isAdmin) {
+    query = query.eq('user_id', user.id)
+  }
+
+  await query
 
   revalidatePath('/admin/reservations')
   revalidatePath('/dashboard/reservations')

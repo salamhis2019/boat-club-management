@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { ROLES } from '@/lib/constants/roles.const'
+import { isValidUuid } from '@/lib/validations/common'
 import { NextRequest, NextResponse } from 'next/server'
 import { BUCKETS } from '@/lib/constants/buckets.const'
 
@@ -8,6 +10,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
+
+  if (!isValidUuid(id)) {
+    return NextResponse.json({ error: 'Invalid document ID' }, { status: 400 })
+  }
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -36,7 +42,7 @@ export async function GET(
   }
 
   // Only admin or the document owner can view
-  if (profile?.role !== 'admin' && doc.user_id !== user.id) {
+  if (profile?.role !== ROLES.ADMIN && doc.user_id !== user.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
