@@ -72,12 +72,14 @@ export async function validateBookingRules(
     return { valid: false, error: 'This boat is not available on the selected date.' }
   }
 
-  // Get user's active reservations for rule checks
+  // Get user's active future reservations for rule checks
+  const today = new Date().toISOString().split('T')[0]
   const { data: activeReservations } = await supabase
     .from('reservations')
     .select('id, date, boat_id, time_slot_id')
     .eq('user_id', userId)
     .eq('status', 'active')
+    .gte('date', today)
 
   const reservations = activeReservations ?? []
 
