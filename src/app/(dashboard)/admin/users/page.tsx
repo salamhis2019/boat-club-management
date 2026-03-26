@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/service'
+import { ROLES } from '@/lib/constants/roles.const'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toggleUserActive } from '@/app/actions/users'
@@ -27,7 +28,7 @@ export default async function AdminUsersPage({
   searchParams: Promise<{ view?: string; page?: string; search?: string }>
 }) {
   const { view, page: pageParam, search } = await searchParams
-  const tab = view === 'members' ? 'member' : view === 'admins' ? 'admin' : 'all'
+  const tab = view === 'members' ? ROLES.MEMBER : view === 'admins' ? ROLES.ADMIN : 'all'
   const page = parsePage({ page: pageParam })
 
   const supabase = createServiceClient()
@@ -35,8 +36,8 @@ export default async function AdminUsersPage({
   // Count queries for tab badges
   const [{ count: allCount }, { count: memberCount }, { count: adminCount }] = await Promise.all([
     supabase.from('users').select('*', { count: 'exact', head: true }),
-    supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'member'),
-    supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'admin'),
+    supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', ROLES.MEMBER),
+    supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', ROLES.ADMIN),
   ])
 
   // Paginated query
@@ -52,7 +53,11 @@ export default async function AdminUsersPage({
   }
 
   if (search) {
-    query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`)
+    // Sanitize search input — strip PostgREST filter control characters to prevent injection
+    const sanitized = search.replace(/[%_.,()\\]/g, '')
+    if (sanitized) {
+      query = query.or(`first_name.ilike.%${sanitized}%,last_name.ilike.%${sanitized}%,email.ilike.%${sanitized}%`)
+    }
   }
 
   const { data: users, count } = await query
@@ -63,8 +68,8 @@ export default async function AdminUsersPage({
 
   const roleVariant = (role: string) => {
     switch (role) {
-      case 'admin': return 'default' as const
-      case 'member': return 'secondary' as const
+      case ROLES.ADMIN: return 'default' as const
+      case ROLES.MEMBER: return 'secondary' as const
       default: return 'outline' as const
     }
   }
@@ -153,8 +158,8 @@ export default async function AdminUsersPage({
 
       <TabSwitcher tabs={[
         { label: 'All', href: `/admin/users?view=all${searchSuffix}`, count: allCount ?? 0, active: tab === 'all' },
-        { label: 'Members', href: `/admin/users?view=members${searchSuffix}`, count: memberCount ?? 0, active: tab === 'member' },
-        { label: 'Admins', href: `/admin/users?view=admins${searchSuffix}`, count: adminCount ?? 0, active: tab === 'admin' },
+        { label: 'Members', href: `/admin/users?view=members${searchSuffix}`, count: memberCount ?? 0, active: tab === ROLES.MEMBER },
+        { label: 'Admins', href: `/admin/users?view=admins${searchSuffix}`, count: adminCount ?? 0, active: tab === ROLES.ADMIN },
       ]} />
 
       <DataTable

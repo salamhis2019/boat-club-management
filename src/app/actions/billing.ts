@@ -87,6 +87,10 @@ export async function getDefaultPaymentMethodId(): Promise<string | null> {
 }
 
 export async function deletePaymentMethod(paymentMethodId: string): Promise<{ error?: string }> {
+  if (!paymentMethodId || !/^pm_[a-zA-Z0-9]+$/.test(paymentMethodId)) {
+    return { error: 'Invalid payment method ID.' }
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -120,6 +124,10 @@ export async function deletePaymentMethod(paymentMethodId: string): Promise<{ er
 }
 
 export async function setDefaultPaymentMethod(paymentMethodId: string): Promise<{ error?: string }> {
+  if (!paymentMethodId || !/^pm_[a-zA-Z0-9]+$/.test(paymentMethodId)) {
+    return { error: 'Invalid payment method ID.' }
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {

@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { createUser, updateUser, type UserActionState } from '@/app/actions/users'
+import { ROLES } from '@/lib/constants/roles.const'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,7 +14,7 @@ import Link from 'next/link'
 export function UserForm({ user }: { user?: User }) {
   const action = user ? updateUser : createUser
   const [state, formAction, pending] = useActionState<UserActionState, FormData>(action, null)
-  const [role, setRole] = useState<string>(user?.role ?? 'member')
+  const [role, setRole] = useState<string>(user?.role ?? ROLES.MEMBER)
   const [membershipType, setMembershipType] = useState<string>(user?.membership_type ?? 'monthly')
   const [membershipActive, setMembershipActive] = useState(user?.membership_active ?? true)
 
@@ -100,8 +101,8 @@ export function UserForm({ user }: { user?: User }) {
                 value={role}
                 onChange={setRole}
                 options={[
-                  { value: 'member', label: 'Member' },
-                  { value: 'admin', label: 'Admin' },
+                  { value: ROLES.MEMBER, label: 'Member' },
+                  { value: ROLES.ADMIN, label: 'Admin' },
                 ]}
                 required
               />

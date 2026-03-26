@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { ROLES } from '@/lib/constants/roles.const'
 import { loginSchema, resetPasswordSchema, updatePasswordSchema } from '@/lib/validations/auth'
 import { redirect } from 'next/navigation'
 
@@ -39,7 +40,7 @@ export async function login(_prevState: AuthState, formData: FormData): Promise<
     .eq('id', data.user.id)
     .single()
 
-  const destination = profile?.role === 'admin' ? '/admin' : '/dashboard'
+  const destination = profile?.role === ROLES.ADMIN ? '/admin' : '/dashboard'
   redirect(destination)
 }
 

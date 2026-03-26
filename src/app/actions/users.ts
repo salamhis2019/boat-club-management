@@ -1,7 +1,8 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { requireAdmin } from '@/lib/supabase/auth'
+import { isValidUuid } from '@/lib/validations/common'
 import { createUserSchema, updateUserSchema } from '@/lib/validations/users'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -10,22 +11,6 @@ export type UserActionState = {
   error?: string
   success?: string
 } | null
-
-async function requireAdmin() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
-
-  const serviceClient = createServiceClient()
-  const { data: profile } = await serviceClient
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') throw new Error('Not authorized')
-  return user
-}
 
 export async function createUser(_prevState: UserActionState, formData: FormData): Promise<UserActionState> {
   const raw = {
@@ -142,6 +127,8 @@ export async function updateUser(_prevState: UserActionState, formData: FormData
 }
 
 export async function toggleUserActive(id: string): Promise<void> {
+  if (!isValidUuid(id)) return
+
   try {
     await requireAdmin()
   } catch {
