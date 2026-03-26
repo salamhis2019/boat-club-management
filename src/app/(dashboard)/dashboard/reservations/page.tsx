@@ -74,7 +74,7 @@ export default async function MyReservationsPage({
     {
       header: 'Status',
       cell: (row) => (
-        <Badge variant={row.status === 'active' ? 'default' : 'secondary'}>
+        <Badge variant={row.status === 'active' ? 'default' : row.status === 'completed' ? 'outline' : 'secondary'}>
           {row.status}
         </Badge>
       ),

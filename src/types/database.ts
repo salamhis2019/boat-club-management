@@ -2,7 +2,7 @@
 
 export type UserRole = 'admin' | 'member' | 'sub_user'
 export type MembershipType = 'monthly' | 'annual'
-export type ReservationStatus = 'active' | 'cancelled'
+export type ReservationStatus = 'active' | 'cancelled' | 'completed'
 export type ChargeType = 'gas' | 'misc'
 export type ChargeStatus = 'pending' | 'paid' | 'failed'
 export type DocumentType = 'waiver' | 'drivers_license'

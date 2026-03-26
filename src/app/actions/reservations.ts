@@ -147,7 +147,7 @@ export async function cancelReservation(id: string): Promise<void> {
 
   const isAdmin = profile?.role === ROLES.ADMIN
 
-  // Build the update query
+  // Only allow cancelling active reservations
   let query = serviceClient
     .from('reservations')
     .update({
@@ -155,6 +155,7 @@ export async function cancelReservation(id: string): Promise<void> {
       cancelled_at: new Date().toISOString(),
     })
     .eq('id', id)
+    .eq('status', 'active')
 
   // Non-admins can only cancel their own reservations
   if (!isAdmin) {
