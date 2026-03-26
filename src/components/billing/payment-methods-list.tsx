@@ -4,6 +4,13 @@ import { useState } from 'react'
 import { deletePaymentMethod, setDefaultPaymentMethod } from '@/app/actions/billing'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import { CreditCardIcon, Trash2Icon, StarIcon, LinkIcon } from 'lucide-react'
 
 type PaymentMethod = {
@@ -22,10 +29,13 @@ export function PaymentMethodsList({
   defaultId: string | null
 }) {
   const [loading, setLoading] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<PaymentMethod | null>(null)
 
-  const handleDelete = async (pmId: string) => {
-    setLoading(pmId)
-    await deletePaymentMethod(pmId)
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setLoading(deleteTarget.id)
+    setDeleteTarget(null)
+    await deletePaymentMethod(deleteTarget.id)
     window.location.reload()
   }
 
@@ -102,7 +112,7 @@ export function PaymentMethodsList({
               <Button
                 variant="ghost"
                 size="icon-sm"
-                onClick={() => handleDelete(pm.id)}
+                onClick={() => setDeleteTarget(pm)}
                 disabled={loading === pm.id}
                 className="text-muted-foreground hover:text-destructive"
               >
@@ -112,6 +122,29 @@ export function PaymentMethodsList({
           </div>
         )
       })}
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Payment Method</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove{' '}
+              {deleteTarget?.brand === 'link'
+                ? 'Stripe Link'
+                : `${deleteTarget?.brand} **** ${deleteTarget?.last4}`}
+              ? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Remove
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -24,6 +24,7 @@ import {
   CreditCardIcon,
   UsersIcon,
   FileTextIcon,
+  SettingsIcon,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -41,6 +42,7 @@ const adminLinks: NavLink[] = [
   { href: '/admin/reservations', label: 'Reservations', icon: CalendarDaysIcon },
   { href: '/admin/charges', label: 'Charges', icon: DollarSignIcon },
   { href: '/admin/documents', label: 'Documents', icon: FileTextIcon },
+  { href: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ]
 
 const memberLinks: NavLink[] = [

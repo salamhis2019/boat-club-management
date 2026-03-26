@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { stripe, ensureStripeCustomer } from '@/lib/stripe'
+import { getStripe, ensureStripeCustomer } from '@/lib/stripe'
 import { revalidatePath } from 'next/cache'
 
 export async function createSetupIntent(): Promise<{ clientSecret: string | null; error?: string }> {
@@ -14,6 +14,7 @@ export async function createSetupIntent(): Promise<{ clientSecret: string | null
 
   try {
     const customerId = await ensureStripeCustomer(user.id)
+    const stripe = await getStripe()
     const setupIntent = await stripe.setupIntents.create({
       customer: customerId,
       automatic_payment_methods: { enabled: true },
@@ -42,12 +43,23 @@ export async function getPaymentMethods() {
   }
 
   try {
+    const stripe = await getStripe()
     const [cardMethods, linkMethods] = await Promise.all([
       stripe.paymentMethods.list({ customer: profile.stripe_customer_id, type: 'card' }),
       stripe.paymentMethods.list({ customer: profile.stripe_customer_id, type: 'link' }),
     ])
 
     const allMethods = [...cardMethods.data, ...linkMethods.data]
+
+    // Auto-set default if customer has methods but no default
+    if (allMethods.length > 0) {
+      const customer = await stripe.customers.retrieve(profile.stripe_customer_id)
+      if (!customer.deleted && !customer.invoice_settings?.default_payment_method) {
+        await stripe.customers.update(profile.stripe_customer_id, {
+          invoice_settings: { default_payment_method: allMethods[0].id },
+        })
+      }
+    }
 
     return allMethods.map((pm) => ({
       id: pm.id,
@@ -76,6 +88,7 @@ export async function getDefaultPaymentMethodId(): Promise<string | null> {
   if (!profile?.stripe_customer_id) return null
 
   try {
+    const stripe = await getStripe()
     const customer = await stripe.customers.retrieve(profile.stripe_customer_id)
     if (customer.deleted) return null
     const defaultPm = customer.invoice_settings?.default_payment_method
@@ -110,6 +123,7 @@ export async function deletePaymentMethod(paymentMethodId: string): Promise<{ er
   }
 
   try {
+    const stripe = await getStripe()
     const pm = await stripe.paymentMethods.retrieve(paymentMethodId)
     if (pm.customer !== profile.stripe_customer_id) {
       return { error: 'Payment method not found.' }
@@ -146,6 +160,7 @@ export async function setDefaultPaymentMethod(paymentMethodId: string): Promise<
   }
 
   try {
+    const stripe = await getStripe()
     const pm = await stripe.paymentMethods.retrieve(paymentMethodId)
     if (pm.customer !== profile.stripe_customer_id) {
       return { error: 'Payment method not found.' }

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { loadStripe } from '@stripe/stripe-js'
+import { useState, useEffect } from 'react'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
+import { getStripeClient } from '@/lib/stripe-client'
 import { createSetupIntent } from '@/app/actions/billing'
 import { Button } from '@/components/ui/button'
 import {
@@ -13,8 +13,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { PlusIcon } from 'lucide-react'
-
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+import type { Stripe as StripeType } from '@stripe/stripe-js'
 
 function SetupForm({ onSuccess }: { onSuccess: () => void }) {
   const stripe = useStripe()
@@ -61,7 +60,12 @@ function SetupForm({ onSuccess }: { onSuccess: () => void }) {
 export function AddPaymentMethod() {
   const [open, setOpen] = useState(false)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
+  const [stripeInstance, setStripeInstance] = useState<StripeType | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    getStripeClient().then(setStripeInstance)
+  }, [])
 
   const handleOpen = async (isOpen: boolean) => {
     setOpen(isOpen)
@@ -96,8 +100,8 @@ export function AddPaymentMethod() {
         {error && (
           <p className="text-sm text-destructive">{error}</p>
         )}
-        {clientSecret ? (
-          <Elements stripe={stripePromise} options={{ clientSecret }}>
+        {clientSecret && stripeInstance ? (
+          <Elements stripe={stripeInstance} options={{ clientSecret }}>
             <SetupForm onSuccess={handleSuccess} />
           </Elements>
         ) : !error ? (
