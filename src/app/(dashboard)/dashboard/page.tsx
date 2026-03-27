@@ -1,17 +1,19 @@
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { redirect } from 'next/navigation'
 import { AlertTriangleIcon } from 'lucide-react'
 import Link from 'next/link'
 
 export default async function MemberDashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const serviceClient = createServiceClient()
   const { data: profile } = await serviceClient
     .from('users')
     .select('rules_accepted, documents_approved')
-    .eq('id', user!.id)
+    .eq('id', user.id)
     .single()
 
   return (
