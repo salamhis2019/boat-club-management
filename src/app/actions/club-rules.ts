@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { requireAdmin } from '@/lib/supabase/auth'
 import { ROLES } from '@/lib/constants/roles.const'
 import { isValidUuid } from '@/lib/validations/common'
 import { uploadClubRuleSchema, signClubRuleSchema } from '@/lib/validations/club-rules'
@@ -17,22 +18,6 @@ export type ClubRuleActionState = {
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
-async function requireAdmin() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const serviceClient = createServiceClient()
-  const { data: profile } = await serviceClient
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== ROLES.ADMIN) return null
-  return user
-}
-
 export async function uploadClubRule(
   _prevState: ClubRuleActionState,
   formData: FormData
@@ -47,8 +32,10 @@ export async function uploadClubRule(
     return { error: result.error.issues[0].message }
   }
 
-  const admin = await requireAdmin()
-  if (!admin) {
+  let admin: Awaited<ReturnType<typeof requireAdmin>>
+  try {
+    admin = await requireAdmin()
+  } catch {
     return { error: 'Only admins can upload club rules.' }
   }
 
@@ -127,8 +114,9 @@ export async function setActiveRule(ruleId: string): Promise<{ error?: string }>
     return { error: 'Invalid rule ID.' }
   }
 
-  const admin = await requireAdmin()
-  if (!admin) {
+  try {
+    await requireAdmin()
+  } catch {
     return { error: 'Only admins can manage club rules.' }
   }
 
@@ -173,8 +161,9 @@ export async function deleteClubRule(ruleId: string): Promise<{ error?: string }
     return { error: 'Invalid rule ID.' }
   }
 
-  const admin = await requireAdmin()
-  if (!admin) {
+  try {
+    await requireAdmin()
+  } catch {
     return { error: 'Only admins can delete club rules.' }
   }
 
