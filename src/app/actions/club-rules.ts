@@ -67,12 +67,15 @@ export async function uploadClubRule(
 
   const serviceClient = createServiceClient()
 
-  // Get next version number
-  const { count } = await serviceClient
+  // Get next version number (use MAX to avoid race conditions)
+  const { data: maxVersion } = await serviceClient
     .from('club_rules')
-    .select('*', { count: 'exact', head: true })
+    .select('version')
+    .order('version', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
-  const version = (count ?? 0) + 1
+  const version = (maxVersion?.version ?? 0) + 1
 
   // Upload file
   const storagePath = `rules/${crypto.randomUUID()}.pdf`
@@ -84,15 +87,7 @@ export async function uploadClubRule(
     return { error: 'Failed to upload file. Please try again.' }
   }
 
-  // If setting as active, deactivate all others first
-  if (result.data.setActive) {
-    await serviceClient
-      .from('club_rules')
-      .update({ is_active: false })
-      .eq('is_active', true)
-  }
-
-  // Insert club rule record
+  // Insert club rule record first, then deactivate others (atomic ordering)
   const { error: insertError } = await serviceClient.from('club_rules').insert({
     title: result.data.title,
     file_url: storagePath,
@@ -104,6 +99,15 @@ export async function uploadClubRule(
   if (insertError) {
     await serviceClient.storage.from(BUCKETS.CLUB_RULES).remove([storagePath])
     return { error: 'Failed to save rule record. Please try again.' }
+  }
+
+  // Deactivate other rules AFTER insert succeeds (avoids zero-active-rules window)
+  if (result.data.setActive) {
+    await serviceClient
+      .from('club_rules')
+      .update({ is_active: false })
+      .eq('is_active', true)
+      .neq('version', version)
   }
 
   // If set as active, reset rules_accepted for all members who haven't signed this version

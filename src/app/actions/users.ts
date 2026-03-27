@@ -108,10 +108,13 @@ export async function updateUser(_prevState: UserActionState, formData: FormData
 
   // Update email in auth if changed
   if (result.data.email) {
-    updateData.email = result.data.email
-    await serviceClient.auth.admin.updateUserById(result.data.id, {
+    const { error: authEmailError } = await serviceClient.auth.admin.updateUserById(result.data.id, {
       email: result.data.email,
     })
+    if (authEmailError) {
+      return { error: `Failed to update email: ${authEmailError.message}` }
+    }
+    updateData.email = result.data.email
   }
 
   const { error } = await serviceClient
