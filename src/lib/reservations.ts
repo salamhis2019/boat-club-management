@@ -28,7 +28,7 @@ export async function validateBookingRules(
   if (!isAdmin) {
     const { data: user } = await supabase
       .from('users')
-      .select('documents_approved, membership_active')
+      .select('documents_approved, membership_active, rules_accepted')
       .eq('id', userId)
       .single()
 
@@ -38,6 +38,11 @@ export async function validateBookingRules(
 
     if (!user.documents_approved) {
       return { valid: false, error: 'Your documents must be approved before booking.' }
+    }
+
+    // Rule: Club rules must be signed (members only)
+    if (!user.rules_accepted) {
+      return { valid: false, error: 'You must sign the club rules before booking.' }
     }
 
     // Rule 7: Membership must be active (members only)
