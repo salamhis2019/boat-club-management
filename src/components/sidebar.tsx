@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -72,22 +73,44 @@ function NavLinks({
   pathname: string
   onNavigate?: () => void
 }) {
+  const router = useRouter()
+  const [pendingHref, setPendingHref] = useState<string | null>(null)
+
+  // Clear pending state when navigation completes
+  useEffect(() => {
+    setPendingHref(null)
+  }, [pathname])
+
   return (
-    <nav className="flex flex-col gap-1">
+    <nav className="relative flex flex-col gap-1">
       {links.map((link) => {
         const isActive = pathname === link.href
+        const isPending = pendingHref === link.href && !isActive
+        const isStale = isActive && pendingHref !== null && pendingHref !== link.href
+
         return (
           <Link
             key={link.href}
             href={link.href}
-            onClick={onNavigate}
-            className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-              isActive
+            onClick={(e) => {
+              if (isActive) return
+              e.preventDefault()
+              setPendingHref(link.href)
+              onNavigate?.()
+              router.push(link.href)
+            }}
+            className={`relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-150 ${
+              isPending || (isActive && !isStale)
                 ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                : isStale
+                  ? 'text-muted-foreground'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
             }`}
           >
-            <link.icon className="size-4" />
+            {(isPending || (isActive && !isStale)) && (
+              <span className="absolute inset-y-1 left-0 w-[3px] rounded-full bg-primary animate-in fade-in slide-in-from-left-1 duration-150" />
+            )}
+            <link.icon className={`size-4 ${isPending ? 'animate-pulse' : ''}`} />
             {link.label}
           </Link>
         )
