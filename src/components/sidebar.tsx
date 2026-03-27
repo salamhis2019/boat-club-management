@@ -25,6 +25,7 @@ import {
   UsersIcon,
   FileTextIcon,
   SettingsIcon,
+  ScrollTextIcon,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -42,6 +43,7 @@ const adminLinks: NavLink[] = [
   { href: '/admin/reservations', label: 'Reservations', icon: CalendarDaysIcon },
   { href: '/admin/charges', label: 'Charges', icon: DollarSignIcon },
   { href: '/admin/documents', label: 'Documents', icon: FileTextIcon },
+  { href: '/admin/club-rules', label: 'Club Rules', icon: ScrollTextIcon },
   { href: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ]
 
@@ -51,6 +53,7 @@ const memberLinks: NavLink[] = [
   { href: '/dashboard/reservations', label: 'My Reservations', icon: CalendarDaysIcon },
   { href: '/dashboard/billing', label: 'Billing', icon: CreditCardIcon },
   { href: '/dashboard/documents', label: 'Documents', icon: FileTextIcon },
+  { href: '/dashboard/club-rules', label: 'Club Rules', icon: ScrollTextIcon },
 ]
 
 type SidebarProps = {

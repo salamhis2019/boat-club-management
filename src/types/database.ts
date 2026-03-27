@@ -18,6 +18,7 @@ export interface User {
   membership_type: MembershipType
   membership_active: boolean
   documents_approved: boolean
+  rules_accepted: boolean
   stripe_customer_id: string | null
   is_active: boolean
   created_at: string
@@ -113,6 +114,24 @@ export interface AuditLog {
   target_id: string
   metadata: Record<string, unknown>
   created_at: string
+}
+
+export interface ClubRule {
+  id: string
+  title: string
+  file_url: string
+  version: number
+  is_active: boolean
+  uploaded_by: string
+  created_at: string
+}
+
+export interface ClubRuleSignature {
+  id: string
+  user_id: string
+  club_rule_id: string
+  signature_url: string
+  signed_at: string
 }
 
 // Extended types with relations
