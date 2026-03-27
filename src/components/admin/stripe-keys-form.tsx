@@ -20,7 +20,10 @@ export function StripeKeysForm({ keyStatus }: { keyStatus: KeyStatus }) {
         <div className="flex items-center justify-between">
           <CardTitle>Stripe API Keys</CardTitle>
           {keyStatus.source === 'database' && (
-            <Badge>Stored in database</Badge>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-green-300 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700 dark:border-green-700 dark:bg-green-950/50 dark:text-green-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+              Stored in database
+            </span>
           )}
           {keyStatus.source === 'env' && (
             <Badge variant="secondary">Using environment variables</Badge>

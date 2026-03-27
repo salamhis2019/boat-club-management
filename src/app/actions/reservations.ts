@@ -11,6 +11,7 @@ import { redirect } from 'next/navigation'
 
 export type ReservationActionState = {
   error?: string
+  success?: boolean
 } | null
 
 export async function createReservation(_prevState: ReservationActionState, formData: FormData): Promise<ReservationActionState> {
@@ -62,7 +63,9 @@ export async function createReservation(_prevState: ReservationActionState, form
     return { error: 'Failed to create reservation. Please try again.' }
   }
 
-  redirect('/dashboard/reservations')
+  revalidatePath('/dashboard/reservations')
+  revalidatePath('/dashboard/book')
+  return { success: true }
 }
 
 export async function createReservationOnBehalf(_prevState: ReservationActionState, formData: FormData): Promise<ReservationActionState> {
