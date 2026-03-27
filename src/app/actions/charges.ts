@@ -49,11 +49,19 @@ export async function createCharge(_prevState: ChargeActionState, formData: Form
 
   // Generate invoice number: INV-YYYY-XXXX
   const year = new Date().getFullYear()
-  const { count } = await serviceClient
+  const { data: maxInvoice } = await serviceClient
     .from('charges')
-    .select('*', { count: 'exact', head: true })
+    .select('invoice_number')
+    .like('invoice_number', `INV-${year}-%`)
+    .order('invoice_number', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
-  const seq = String((count ?? 0) + 1).padStart(4, '0')
+  let seq = '0001'
+  if (maxInvoice?.invoice_number) {
+    const lastSeq = parseInt(maxInvoice.invoice_number.split('-')[2], 10)
+    seq = String(lastSeq + 1).padStart(4, '0')
+  }
   const invoiceNumber = `INV-${year}-${seq}`
 
   // Ensure target user has a Stripe customer

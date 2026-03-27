@@ -15,6 +15,10 @@ export async function POST(request: Request) {
   const stripe = await getStripe()
   const { webhookSecret } = await getStripeKeys()
 
+  if (!webhookSecret) {
+    return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 })
+  }
+
   let event
   try {
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
