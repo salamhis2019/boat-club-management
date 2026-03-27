@@ -5,8 +5,16 @@ import { createReservation, cancelReservation, type ReservationActionState } fro
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Calendar } from '@/components/ui/calendar'
-import { Clock, CheckCircle2, XCircle, Users, Phone, X, CalendarDays } from 'lucide-react'
+import { Clock, CheckCircle2, XCircle, Users, Phone, X, CalendarDays, Anchor, PartyPopper } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import Image from 'next/image'
 import { formatDateString, formatTime } from '@/lib/helpers/date.helper'
 
@@ -56,10 +64,28 @@ export default function BookPage() {
   const [confirmingSidebarCancel, setConfirmingSidebarCancel] = useState<string | null>(null)
   const [sidebarCancelling, setSidebarCancelling] = useState<string | null>(null)
   const [highlightedBoat, setHighlightedBoat] = useState<string | null>(null)
+  const [showSuccess, setShowSuccess] = useState(false)
+  const [successDetails, setSuccessDetails] = useState<{ boat: string; slot: string; time: string; date: string } | null>(null)
 
   // Reset dismissed state when a new error comes in
   useEffect(() => {
     if (state?.error) setDismissedError(false)
+  }, [state])
+
+  // Show success celebration and redirect
+  useEffect(() => {
+    if (state?.success && selected) {
+      const boat = availability.find((b) => b.id === selected.boat_id)
+      const slot = boat?.slots.find((s) => s.id === selected.time_slot_id)
+      setSuccessDetails({
+        boat: boat?.name ?? 'Your boat',
+        slot: slot?.name ?? '',
+        time: slot ? `${formatTime(slot.start_time)} – ${formatTime(slot.end_time)}` : '',
+        date,
+      })
+      setShowSuccess(true)
+      setSelected(null)
+    }
   }, [state])
 
   const refreshMyReservations = () => {
@@ -75,20 +101,60 @@ export default function BookPage() {
       .then(({ data: res }) => setMyReservations((res as unknown as UserReservation[]) ?? []))
   }
 
+  const refreshAvailability = () => {
+    if (!date) return
+    const params = new URLSearchParams({ date })
+    fetch(`/api/reservations/available?${params}`)
+      .then((res) => res.json())
+      .then((data) => setAvailability(data.availability ?? []))
+  }
+
   const handleCancel = async (reservationId: string) => {
     setCancelling(reservationId)
     try {
       await cancelReservation(reservationId)
       setConfirmingCancel(null)
-      // Re-fetch availability after cancel
-      const params = new URLSearchParams({ date })
-      const res = await fetch(`/api/reservations/available?${params}`)
-      const data = await res.json()
-      setAvailability(data.availability ?? [])
+      refreshAvailability()
       refreshMyReservations()
     } finally {
       setCancelling(null)
     }
+  }
+
+  const handleSidebarCancel = async (reservationId: string) => {
+    setSidebarCancelling(reservationId)
+    try {
+      await cancelReservation(reservationId)
+      setConfirmingSidebarCancel(null)
+      refreshMyReservations()
+      refreshAvailability()
+    } finally {
+      setSidebarCancelling(null)
+    }
+  }
+
+  const handleDismissSuccess = () => {
+    setShowSuccess(false)
+    setSuccessDetails(null)
+    refreshMyReservations()
+    refreshAvailability()
+  }
+
+  const handleViewReservation = (res: UserReservation) => {
+    const d = new Date(res.date + 'T00:00:00')
+    setSelectedDay(d)
+    setDate(res.date)
+    setHighlightedBoat(res.boat_id)
+    const tryScroll = (attempts: number) => {
+      const el = document.getElementById(`boat-${res.boat_id}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      } else if (attempts > 0) {
+        setTimeout(() => tryScroll(attempts - 1), 300)
+      }
+    }
+    setTimeout(() => tryScroll(5), 300)
+    setTimeout(() => setHighlightedBoat(null), 3500)
   }
 
   // Min date = today (same-day shows "call to schedule")
@@ -155,6 +221,49 @@ export default function BookPage() {
         </div>
       )}
 
+      {/* Success celebration dialog */}
+      <Dialog open={showSuccess && !!successDetails} onOpenChange={(open) => { if (!open) handleDismissSuccess() }}>
+        <DialogContent className="max-w-sm gap-0 overflow-hidden p-0" showCloseButton={false}>
+          <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-8 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              <Anchor className="h-8 w-8 text-primary" />
+            </div>
+            <DialogHeader className="items-center">
+              <div className="flex items-center justify-center gap-2">
+                <PartyPopper className="h-5 w-5 text-amber-500" />
+                <DialogTitle className="text-xl">You&apos;re All Set!</DialogTitle>
+                <PartyPopper className="h-5 w-5 -scale-x-100 text-amber-500" />
+              </div>
+              <DialogDescription>Your reservation has been confirmed</DialogDescription>
+            </DialogHeader>
+          </div>
+          {successDetails && (
+            <div className="space-y-3 p-6">
+              <div className="rounded-lg bg-muted/50 p-3 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Boat</span>
+                  <span className="text-sm font-semibold">{successDetails.boat}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Date</span>
+                  <span className="text-sm font-medium">{successDetails.date}</span>
+                </div>
+                {successDetails.slot && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Time</span>
+                    <span className="text-sm font-medium">{successDetails.slot} &middot; {successDetails.time}</span>
+                  </div>
+                )}
+              </div>
+              <Button className="w-full" onClick={handleDismissSuccess}>
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Continue Booking
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div className="flex flex-col gap-6 lg:flex-row">
         {/* Calendar */}
         <div className="w-full lg:sticky lg:top-6 lg:w-auto lg:shrink-0 lg:self-start">
@@ -195,24 +304,7 @@ export default function BookPage() {
                     <div className="mt-2 flex gap-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          const d = new Date(res.date + 'T00:00:00')
-                          setSelectedDay(d)
-                          setDate(res.date)
-                          setHighlightedBoat(res.boat_id)
-                          // Scroll after availability loads, retry if element not found yet
-                          const tryScroll = (attempts: number) => {
-                            const el = document.getElementById(`boat-${res.boat_id}`)
-                            if (el) {
-                              el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                            } else if (attempts > 0) {
-                              setTimeout(() => tryScroll(attempts - 1), 300)
-                            }
-                          }
-                          setTimeout(() => tryScroll(5), 300)
-                          // Remove highlight after 3 seconds
-                          setTimeout(() => setHighlightedBoat(null), 3500)
-                        }}
+                        onClick={() => handleViewReservation(res)}
                         className="cursor-pointer rounded-md border border-border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-muted"
                       >
                         View
@@ -244,22 +336,7 @@ export default function BookPage() {
                           <button
                             type="button"
                             disabled={sidebarCancelling === res.id}
-                            onClick={async () => {
-                              setSidebarCancelling(res.id)
-                              try {
-                                await cancelReservation(res.id)
-                                setConfirmingSidebarCancel(null)
-                                refreshMyReservations()
-                                if (date) {
-                                  const params = new URLSearchParams({ date })
-                                  const response = await fetch(`/api/reservations/available?${params}`)
-                                  const data = await response.json()
-                                  setAvailability(data.availability ?? [])
-                                }
-                              } finally {
-                                setSidebarCancelling(null)
-                              }
-                            }}
+                            onClick={() => handleSidebarCancel(res.id)}
                             className="cursor-pointer rounded-md bg-red-500 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-red-600 disabled:opacity-50"
                           >
                             {sidebarCancelling === res.id ? 'Cancelling...' : 'Confirm'}
@@ -280,7 +357,24 @@ export default function BookPage() {
             <p className="text-sm text-muted-foreground">Select a date from the calendar to see available boats.</p>
           )}
 
-          {loading && <p className="text-sm text-muted-foreground">Loading available boats...</p>}
+          {loading && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Card key={i} className="flex flex-col overflow-hidden">
+                  <Skeleton className="h-56 w-full rounded-none" />
+                  <CardHeader>
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="mt-2 h-4 w-full" />
+                    <Skeleton className="mt-2 h-7 w-28 rounded-full" />
+                  </CardHeader>
+                  <CardContent className="mt-auto space-y-2">
+                    <Skeleton className="h-14 rounded-lg" />
+                    <Skeleton className="h-14 rounded-lg" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
           {!loading && date && availability.length === 0 && (
             <p className="text-sm text-muted-foreground">No boats found for this date.</p>
